@@ -40,50 +40,68 @@ import csv
 os.chdir(r'C:\Users\bcalverley\OneDrive - Scripps Research\Documents\0Balch lab')
 import to_precision
 
+variant = 'Delta'
+path = os.path.join(r'C:\Users\bcalverley\OneDrive - Scripps Research\Documents\0Balch lab\0COVID\VOC_dominance',variant)
+
 #%% Import data
 cell_time = time.time()
 
-fileName = '12_15_21'
+# fileName = '12_15_21'
 # proteinLength = 29903
-os.chdir(r'C:\Users\bcalverley\OneDrive - Scripps Research\Documents\0Balch lab\0COVID')
-covid = pd.read_csv('BCC collated covid data.csv')
-
-# Only needed if importing from scratch:
-# proteins_data = pd.read_excel('unipCov2Chain_UCSC_Wuh1_edited_CNBC_3.xlsx')
-# proteins_data.index = proteins_data.name
-# proteins_data.drop('ORF10',inplace=True)
-# covid_raw = pd.read_csv(fileName+'.csv')
-# covid = covid_raw.copy()
-# # covid = covid[covid['Variant Type']=='SNP']
-# # covid['VarSeqP'] = covid.Start/proteinLength
-# covid['IR'] = (covid.infection_rate - np.min(covid.infection_rate))/(np.max(covid.infection_rate) - np.min(covid.infection_rate))
-# covid['FR'] = (covid.fatality_rate - np.min(covid.fatality_rate))/(np.max(covid.fatality_rate) - np.min(covid.fatality_rate))
-# covid = covid[(covid.countries>=3)&(covid.counts>=3)].copy()
-# covid = covid[covid.AA.notna()].copy()
-# covid['ProtPos'] = covid[covid.AA.notna()].AA.str.extract('(\d+)')[0].astype('int64')
-#
-# prot_SEL = proteins_data.position.copy()
-# prot_SEL = prot_SEL.str.extract('amino acids (\d+)-(\d+)')
-# prot_SEL = prot_SEL.fillna(0).astype('int64')
-# prot_SEL.rename(columns={0:'protStart',1:'protEnd'},inplace=True)
-# prot_SEL['length'] = prot_SEL['protEnd'] - prot_SEL['protStart'] + 1
-# # proteins_data['length'] = prot_SEL[1] - prot_SEL[0] + 1
-#
-# covid['Protein'] = '-'
-# for cc in covid.index:
-#     for prot in proteins_data.index:
-#         if covid.loc[cc,'Start'] in range(proteins_data.loc[prot,'chromStart'],proteins_data.loc[prot,'chromEnd']):
-#             covid.loc[cc,'Protein'] = prot
-# covid = covid[covid.Protein != '-'].copy()
-# covid['VarSeqP'] = [(covid.loc[idx,'ProtPos'] - prot_SEL.loc[covid.loc[idx,'Protein'],'protStart'] + 1)/(prot_SEL.loc[covid.loc[idx,'Protein'],'length']) for idx in covid.index]
-#
-# covid.to_csv('BCC collated covid data.csv')
-# proteins_data.length.to_csv('protein lengths.csv')
+os.chdir(path)
+covid = pd.read_csv(variant+'BCC collated covid data.csv')
 
 print('---Cell run time:',round(np.floor((time.time() - cell_time)/60)),'minutes,',round((time.time() - cell_time)%60),'seconds---')
 print("Cell completed:",datetime.now())
 
-#%%
+#%% Only needed if importing from scratch:
+cell_time = time.time()
+
+os.chdir(r'C:\Users\bcalverley\OneDrive - Scripps Research\Documents\0Balch lab\0COVID')
+proteins_data = pd.read_excel('unipCov2Chain_UCSC_Wuh1_edited_CNBC_3.xlsx')
+proteins_data.index = proteins_data.name
+proteins_data.drop('ORF10',inplace=True)
+os.chdir(path)
+# covid_raw = pd.read_csv(fileName+'.csv')
+all_files = [f for f in os.listdir(path) if f.endswith('.csv')]
+covid_raw =  pd.concat(map(pd.read_csv,all_files))
+covid = covid_raw.copy().reset_index()
+# covid = covid[covid['Variant Type']=='SNP']
+# covid['VarSeqP'] = covid.Start/proteinLength
+covid['IR'] = (covid.infection_rate - np.min(covid.infection_rate))/(np.max(covid.infection_rate) - np.min(covid.infection_rate))
+covid['FR'] = (covid.fatality_rate - np.min(covid.fatality_rate))/(np.max(covid.fatality_rate) - np.min(covid.fatality_rate))
+covid = covid[(covid.countries>=3)&(covid.counts>=3)].copy()
+covid = covid[covid.AA.notna()].copy()
+covid['ProtPos'] = covid.AA.str.extract('(\d+)')[0].astype('int64')
+
+prot_SEL = proteins_data.position.copy()
+prot_SEL = prot_SEL.str.extract('amino acids (\d+)-(\d+)')
+prot_SEL = prot_SEL.fillna(0).astype('int64')
+prot_SEL.rename(columns={0:'protStart',1:'protEnd'},inplace=True)
+
+# Manual adjustment to avoid negative VarSeqP - CHECK WITH SAL
+prot_SEL.loc['Spike','protStart'] = 1
+prot_SEL.loc['ORF7a','protStart'] = 1
+# proteins_data['length'] = prot_SEL[1] - prot_SEL[0] + 1
+prot_SEL['length'] = prot_SEL['protEnd'] - prot_SEL['protStart'] + 1
+
+# Is there a faster way to do this??
+covid['Protein'] = '-'
+for cc in covid.index:
+    for prot in proteins_data.index:
+        if covid.loc[cc,'Start'] in range(proteins_data.loc[prot,'chromStart'],proteins_data.loc[prot,'chromEnd']):
+            covid.loc[cc,'Protein'] = prot
+covid = covid[covid.Protein != '-'].copy()
+covid['VarSeqP'] = [(covid.loc[idx,'ProtPos'] - prot_SEL.loc[covid.loc[idx,'Protein'],'protStart'] + 1)/(prot_SEL.loc[covid.loc[idx,'Protein'],'length']) for idx in covid.index]
+# covid['VarSeqP'] = [covid.loc[idx,'ProtPos']/(prot_SEL.loc[covid.loc[idx,'Protein'],'length']) for idx in covid.index]
+covid[covid.VarSeqP<0].Protein.value_counts()
+covid.to_csv(variant+'BCC collated covid data.csv')
+# prot_SEL.length.to_csv('protein lengths.csv')
+
+print('---Cell run time:',round(np.floor((time.time() - cell_time)/60)),'minutes,',round((time.time() - cell_time)%60),'seconds---')
+print("Cell completed:",datetime.now())
+
+#%% Kriging export function
 cell_time = time.time()
 
 def kriging_output(innie,note,X,Y,Z,norm=False,save=False,scatter=True,scatterSave=False,yzscatter=True,yzscatterSave=False,yzLogPlot=False,scatLog=False,yzLog=False):
@@ -163,13 +181,16 @@ cell_time = time.time()
 # #     lengths[prot] = spans[prot][1] - spans[prot][0] + 1
 
 for prot in np.unique(covid.Protein):
-    kriging_output(covid[covid.Protein==prot],fileName+'-'+prot+'-all_mutations','VarSeqP','IR','FR',yzLogPlot=True,scatLog=True,save=True,scatterSave=True,yzscatterSave=True)
+    kriging_output(covid[covid.Protein==prot],variant+'-'+prot+'-all_mutations','VarSeqP','IR','FR',yzLogPlot=True,scatLog=True,save=True,scatterSave=True,yzscatterSave=True)
 
 for prot in np.unique(covid.Protein):
-    kriging_output(covid[covid.Protein==prot],fileName+'-'+prot+'-all_mutations-IR_FR_indinorm','VarSeqP','IR','FR',norm=True,yzLogPlot=True,scatLog=True,save=True,scatterSave=True,yzscatterSave=True)
+    kriging_output(covid[covid.Protein==prot],variant+'-'+prot+'-all_mutations-IR_FR_indinorm','VarSeqP','IR','FR',norm=True,yzLogPlot=True,scatLog=True,save=True,scatterSave=True,yzscatterSave=True)
 
 for prot in np.unique(covid.Protein):
-    kriging_output(covid[covid.Protein==prot],fileName+'-'+prot+'-all_mutations-IR_FR_indinorm_and_log','VarSeqP','IR','FR',norm=True,yzLog=True,yzLogPlot=True,scatLog=False,save=True,scatterSave=True,yzscatterSave=True)
+    kriging_output(covid[covid.Protein==prot],variant+'-'+prot+'-all_mutations-IR_FR_indinorm_and_log','VarSeqP','IR','FR',norm=True,yzLog=True,yzLogPlot=True,scatLog=False,save=True,scatterSave=True,yzscatterSave=True)
 
 print('---Cell run time:',round(np.floor((time.time() - cell_time)/60)),'minutes,',round((time.time() - cell_time)%60),'seconds---')
 print("Cell completed:",datetime.now())
+
+engine.say("Run complete")
+engine.runAndWait()
