@@ -40,16 +40,17 @@ import csv
 os.chdir(r'C:\Users\bcalverley\OneDrive - Scripps Research\Documents\0Balch lab')
 import to_precision
 
-variant = 'Delta'
-path = os.path.join(r'C:\Users\bcalverley\OneDrive - Scripps Research\Documents\0Balch lab\0COVID\VOC_dominance',variant)
-
 #%% Import data
 cell_time = time.time()
 
 # fileName = '12_15_21'
 # proteinLength = 29903
-os.chdir(path)
-covid = pd.read_csv(variant+'BCC collated covid data.csv')
+variants = np.array(['Alpha','Delta','Omicron'])
+covid = {}
+for variant in variants:
+    path = os.path.join(r'C:\Users\bcalverley\OneDrive - Scripps Research\Documents\0Balch lab\0COVID\VOC_dominance',variant)
+    os.chdir(path)
+    covid[variant] = pd.read_csv(variant+'-BCC collated covid data.csv')
 
 print('---Cell run time:',round(np.floor((time.time() - cell_time)/60)),'minutes,',round((time.time() - cell_time)%60),'seconds---')
 print("Cell completed:",datetime.now())
@@ -61,42 +62,53 @@ os.chdir(r'C:\Users\bcalverley\OneDrive - Scripps Research\Documents\0Balch lab\
 proteins_data = pd.read_excel('unipCov2Chain_UCSC_Wuh1_edited_CNBC_3.xlsx')
 proteins_data.index = proteins_data.name
 proteins_data.drop('ORF10',inplace=True)
-os.chdir(path)
-# covid_raw = pd.read_csv(fileName+'.csv')
-all_files = [f for f in os.listdir(path) if f.endswith('.csv')]
-covid_raw =  pd.concat(map(pd.read_csv,all_files))
-covid = covid_raw.copy().reset_index()
-# covid = covid[covid['Variant Type']=='SNP']
-# covid['VarSeqP'] = covid.Start/proteinLength
-covid['IR'] = (covid.infection_rate - np.min(covid.infection_rate))/(np.max(covid.infection_rate) - np.min(covid.infection_rate))
-covid['FR'] = (covid.fatality_rate - np.min(covid.fatality_rate))/(np.max(covid.fatality_rate) - np.min(covid.fatality_rate))
-covid = covid[(covid.countries>=3)&(covid.counts>=3)].copy()
-covid = covid[covid.AA.notna()].copy()
-covid['ProtPos'] = covid.AA.str.extract('(\d+)')[0].astype('int64')
-
 prot_SEL = proteins_data.position.copy()
 prot_SEL = prot_SEL.str.extract('amino acids (\d+)-(\d+)')
 prot_SEL = prot_SEL.fillna(0).astype('int64')
 prot_SEL.rename(columns={0:'protStart',1:'protEnd'},inplace=True)
-
-# Manual adjustment to avoid negative VarSeqP - CHECK WITH SAL
-prot_SEL.loc['Spike','protStart'] = 1
-prot_SEL.loc['ORF7a','protStart'] = 1
 # proteins_data['length'] = prot_SEL[1] - prot_SEL[0] + 1
 prot_SEL['length'] = prot_SEL['protEnd'] - prot_SEL['protStart'] + 1
+prot_SEL.length.to_csv('protein lengths.csv')
 
-# Is there a faster way to do this??
-covid['Protein'] = '-'
-for cc in covid.index:
-    for prot in proteins_data.index:
-        if covid.loc[cc,'Start'] in range(proteins_data.loc[prot,'chromStart'],proteins_data.loc[prot,'chromEnd']):
-            covid.loc[cc,'Protein'] = prot
-covid = covid[covid.Protein != '-'].copy()
-covid['VarSeqP'] = [(covid.loc[idx,'ProtPos'] - prot_SEL.loc[covid.loc[idx,'Protein'],'protStart'] + 1)/(prot_SEL.loc[covid.loc[idx,'Protein'],'length']) for idx in covid.index]
-# covid['VarSeqP'] = [covid.loc[idx,'ProtPos']/(prot_SEL.loc[covid.loc[idx,'Protein'],'length']) for idx in covid.index]
-covid[covid.VarSeqP<0].Protein.value_counts()
-covid.to_csv(variant+'BCC collated covid data.csv')
-# prot_SEL.length.to_csv('protein lengths.csv')
+variants = np.array(['Alpha','Delta','Omicron'])
+covid = {}
+dates = {}
+# wave_start = {}
+# wave_end = {}
+for variant in variants:
+    path = os.path.join(r'C:\Users\bcalverley\OneDrive - Scripps Research\Documents\0Balch lab\0COVID\VOC_dominance',variant)
+    os.chdir(path)
+    # covid_raw = pd.read_csv(fileName+'.csv')
+    all_files = np.array([f for f in os.listdir(path) if f.endswith('.csv') if re.match(r'\d\d_\d\d_\d\d.csv',f)])
+    dates[variant] = np.array([datetime.strptime(f,'%m_%d_%y.csv') for f in all_files])
+
+    covid[variant] = pd.concat(map(pd.read_csv,all_files)).copy().reset_index()
+    covid[variant].rename(columns={'infection_rate':'IR','fatality_rate':'FR'},inplace=True)
+    # wave_start[variant] = pd.read_csv(all_files[np.argmin(dates[variant])]).copy()
+    # wave_end[variant] = pd.read_csv(all_files[np.argmax(dates[variant])]).copy()
+
+    print('Data imported for '+variant)
+
+    covid[variant] = covid[variant][(covid[variant].countries>=3)&(covid[variant].counts>=3)].copy()
+    covid[variant] = covid[variant][covid[variant].AA.notna()].copy()
+    covid[variant]['ProtPos'] = covid[variant].AA.str.extract('(\d+)')[0].astype('int64')
+
+    # Is there a faster way to do this??
+    covid[variant]['Protein'] = '-'
+    for cc in covid[variant].index:
+        for prot in proteins_data.index:
+            if covid[variant].loc[cc,'Start'] in range(proteins_data.loc[prot,'chromStart'],proteins_data.loc[prot,'chromEnd']):
+                covid[variant].loc[cc,'Protein'] = prot
+    covid[variant] = covid[variant][covid[variant].Protein != '-'].copy()
+    covid[variant]['VarSeqP'] = [(covid[variant].loc[idx,'ProtPos'] - prot_SEL.loc[covid.loc[idx,'Protein'],'protStart'] + 1)/(prot_SEL.loc[covid[variant].loc[idx,'Protein'],'length']) for idx in covid[variant].index]
+    # covid['VarSeqP'] = [covid.loc[idx,'ProtPos']/(prot_SEL.loc[covid.loc[idx,'Protein'],'length']) for idx in covid.index]
+    # covid[variant][covid[variant].VarSeqP<0].Protein.value_counts()
+
+    print('Data collated for '+variant)
+
+    covid[variant].to_csv(variant+'-BCC collated covid data.csv')
+    # wave_start[variant].to_csv(variant+'-first day data.csv')
+    # wave_end[variant].to_csv(variant+'-final day data.csv')
 
 print('---Cell run time:',round(np.floor((time.time() - cell_time)/60)),'minutes,',round((time.time() - cell_time)%60),'seconds---')
 print("Cell completed:",datetime.now())
