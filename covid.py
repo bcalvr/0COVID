@@ -37,8 +37,8 @@ import os
 import re
 import csv
 
-os.chdir(r'C:\Users\bcalverley\OneDrive - Scripps Research\Documents\0Balch lab')
-import to_precision
+# os.chdir(r'C:\Users\bcalverley\OneDrive - Scripps Research\Documents\0Balch lab')
+# import to_precision
 
 #%% Import data
 cell_time = time.time()
