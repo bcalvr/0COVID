@@ -11,26 +11,28 @@ from scipy.signal import lfilter
 import pickle as pickle
 import sys
 
-# load required
-dates = pd.read_table('dates.txt',header=None,index_col=0)
-old_date = dates.loc['old_date'].values[0]
-new_date = dates.loc['new_date'].values[0]
-
-with open(f"../Input_files/jh_daily_ir_{new_date}.pkl",'rb') as file: #Contains only country name for each date
+# load required 
+# CHANGE DATE
+with open(f"../Input_files/jh_daily_ir_01_16_22.pkl",'rb') as file: #Contains only country name for each date
     jh_daily_ir = pickle.load(file)
-with open(f"../Input_files/jh_data_{new_date}.pkl",'rb') as file:
+# CHANGE DATE  
+with open(f"../Input_files/jh_data_01_16_22.pkl",'rb') as file:
     jh_data=pickle.load(file)
-with open(f"../Input_files/jh_daily_deaths_{new_date}.pkl",'rb') as file:
-    jh_daily_deaths = pickle.load(file)
-with open(f"../Input_files/seq_country_counts_{new_date}.pkl",'rb') as file:
+# CHANGE DATE    
+with open(f"../Input_files/jh_daily_deaths_01_16_22.pkl",'rb') as file:
+    jh_daily_deaths = pickle.load(file)    
+# CHANGE DATE
+with open(f"../Input_files/seq_country_counts_01_16_22.pkl",'rb') as file:
     sequence_country_counts = pickle.load(file)
-with open(f"../Input_files/basis_vector_IR_FR_PP_{new_date}.pkl",'rb') as file:
+# CHANGE DATE
+with open(f"../Input_files/basis_vector_IR_FR_PP_01_16_22.pkl",'rb') as file:
     lagged_FR1 = pickle.load(file)
-with open(f"../Input_files/aggregated_mutations_window00_{dt.strftime(dt.strptime(old_date,'%m_%d_%y') + timedelta(days=1),'%m_%d_%y')}_{new_date}.pkl",'rb') as file:
+# CHANGE DATE
+with open(f"../Input_files/aggregated_mutations_window00_12_16_21_01_16_22.pkl",'rb') as file:
     aggregated_mutations_window = pickle.load(file)
+    
 
-
-date_range = jh_daily_ir.columns[9::]
+date_range = jh_daily_ir.columns[9::]    
 
 lag_tab = pd.read_csv("../Input_files/lag_tab_edited.csv")
 ctr=lag_tab['country']
@@ -46,7 +48,7 @@ list_dates=jh_daily_ir.columns[9::]
 for date in tqdm(list_dates[684:700]):
 #Looping over single variants
     for var in aggregated_mutations_window[date].keys():
-        #For each variant count countries,
+        #For each variant count countries, 
         #totalCounts=len(aggregated_mutations_window[date][var][0])
         for counted in Counter(aggregated_mutations_window[date][var]).items(): #counted is country and counts
             date_lag=date
@@ -58,9 +60,10 @@ for date in tqdm(list_dates[684:700]):
 #            print(date_lag)
             if sequence_country_counts[date][counted[0]]==0:
                 lagged_FR1[date][var].append((counted[1])*jh_daily_deaths.loc[counted[0],date_lag])
-            else:
+            else:    
                 lagged_FR1[date][var].append(round((counted[1]/sequence_country_counts[date][counted[0]])*jh_daily_deaths.loc[counted[0],date_lag],2))
-
-
-with open(f"../Input_files/lagged_FR1_{new_date.replace('_','')}.pkl",'wb') as file:
+      
+    
+# CHANGE DATE
+with open(f"../Input_files/lagged_FR1_011622.pkl",'wb') as file:
     pickle.dump(lagged_FR1,file,protocol=pickle.HIGHEST_PROTOCOL)
